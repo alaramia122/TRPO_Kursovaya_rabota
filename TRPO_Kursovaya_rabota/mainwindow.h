@@ -7,6 +7,7 @@
 #include <QString>
 #include <QMap>
 #include <QtGlobal>
+#include <QtCharts/QChartView>
 
 class MainWindow : public QMainWindow
 {
@@ -30,6 +31,9 @@ private:
 
     // Суммарные размеры файлов по категориям.
     QMap<QString, qint64> categorySizes;
+
+    // Виджет для отображения круговой диаграммы.
+    QtCharts::QChartView* chartView = nullptr;
 
     // Обновляет текущий каталог и список его непосредственных подкаталогов.
     void updateDirectory(const QString& path);
@@ -61,4 +65,7 @@ private:
 
     // Выводит в таблицу статистику выбранного режима.
     void updateStatisticsTable();
+
+    // Обновляет круговую диаграмму для выбранного режима статистики.
+    void updateChart();
 };
