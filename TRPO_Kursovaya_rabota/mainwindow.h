@@ -1,8 +1,12 @@
+
 #pragma once
 
 #include <QtWidgets/QMainWindow>
 #include "ui_mainwindow.h"
+
 #include <QString>
+#include <QMap>
+#include <QtGlobal>
 
 class MainWindow : public QMainWindow
 {
@@ -18,6 +22,15 @@ private:
     // Путь к каталогу, содержимое которого сейчас отображается.
     QString currentPath;
 
+    // Общий размер всех найденных файлов в байтах.
+    qint64 totalSize = 0;
+
+    // Суммарные размеры файлов по непосредственным подкаталогам.
+    QMap<QString, qint64> directorySizes;
+
+    // Суммарные размеры файлов по категориям.
+    QMap<QString, qint64> categorySizes;
+
     // Обновляет текущий каталог и список его непосредственных подкаталогов.
     void updateDirectory(const QString& path);
 
@@ -29,4 +42,23 @@ private:
 
     // Переходит в родительский каталог.
     void navigateToParentDirectory();
+
+    // Выполняет один обход выбранного каталога и собирает статистику.
+    void analyzeCurrentDirectory();
+
+    // Рекурсивно обрабатывает содержимое каталога.
+    void scanDirectory(
+        const QString& path,
+        const QString& topLevelBucket,
+        bool isRoot
+    );
+
+    // Определяет категорию файла по его расширению.
+    QString fileCategory(const QString& extension);
+
+    // Преобразует размер в байтах в удобный для чтения формат.
+    QString formatSize(qint64 bytes);
+
+    // Выводит в таблицу статистику выбранного режима.
+    void updateStatisticsTable();
 };
