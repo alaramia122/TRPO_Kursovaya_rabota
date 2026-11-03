@@ -8,6 +8,8 @@
 #include <QMap>
 #include <QtGlobal>
 #include <QtCharts/QChartView>
+#include <QtCharts/QPieSeries>
+#include <QtCharts/QChart>
 
 class MainWindow : public QMainWindow
 {
@@ -34,6 +36,12 @@ private:
 
     // Виджет для отображения круговой диаграммы.
     QtCharts::QChartView* chartView = nullptr;
+
+	// Сама круговая диаграмма.
+    QtCharts::QChart* chart = nullptr;
+
+	// Серия данных для круговой диаграммы.
+    QtCharts::QPieSeries* series = nullptr;
 
     // Обновляет текущий каталог и список его непосредственных подкаталогов.
     void updateDirectory(const QString& path);
@@ -62,6 +70,12 @@ private:
 
     // Преобразует размер в байтах в удобный для чтения формат.
     QString formatSize(qint64 bytes);
+
+	// Вызывает updateStatisticsTable() и updateChart().
+    void updateChartAndTable();
+
+    // возвращает словарь значений под выбранный режим отображения
+    QMap<QString, qint64>* selectedView();
 
     // Выводит в таблицу статистику выбранного режима.
     void updateStatisticsTable();

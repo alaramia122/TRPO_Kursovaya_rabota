@@ -10,11 +10,7 @@
 #include <QTableWidgetItem>
 #include <QPushButton>
 #include <QComboBox>
-#include <QtCharts/QChart>
-#include <QtCharts/QPieSeries>
-#include <QtCharts/QPieSlice>
 #include <QVBoxLayout>
-#include <QtCharts/QLegend>
 #include <QPainter>
 
 //Конструктор главного окна
@@ -31,13 +27,28 @@ MainWindow::MainWindow(QWidget* parent)
 
 
     // Создаём виджет для диаграммы
-	chartView = new QtCharts::QChartView(ui.chartWidget);       // Создаём виджет для отображения диаграммы и указываем контейнер, в котором он будет размещён.
+	chartView = new QtCharts::QChartView(ui.chartWidget);       // Создаём специализированный виджет для отображения диаграммы и прикрепляем его к контейнеру, созданному в qt-designer.
 
     chartView->setMinimumSize(600, 250);                        // Задаём минимальный размер области отображения диаграммы.
 
     QVBoxLayout* chartLayout = new QVBoxLayout(ui.chartWidget); // Создаём компоновку для размещения диаграммы внутри контейнера.
 
     chartLayout->addWidget(chartView);                          // Добавляем виджет диаграммы в компоновку контейнера.
+
+	// Создаём объект диаграммы и прикрепляем его к виджету диаграммы.
+	series = new QtCharts::QPieSeries();                        // Создаём серию данных для диаграммы.
+
+	chart = new QtCharts::QChart();                             // Создаём объект диаграммы.
+
+	chart->addSeries(series);                                   // Добавляем серию данных в диаграмму.
+
+	chart->setTitle(QStringLiteral("Распределение размера файлов"));    // Устанавливаем заголовок диаграммы.
+
+	chart->legend()->show();                                    // Отображаем легенду диаграммы.
+
+	chartView->setChart(chart);                                 // Устанавливаем диаграмму в виджет диаграммы.
+
+	chartView->setRenderHint(QPainter::Antialiasing);           // Включаем сглаживание для улучшения качества отображения диаграммы.
 
 
     // Подключаем обработчики действий пользователя.
@@ -48,19 +59,15 @@ MainWindow::MainWindow(QWidget* parent)
         this, &MainWindow::navigateToParentDirectory);
 
     connect(ui.subdirectoryComboBox,                            // Комбобокс перехода в выбранный подкаталог.
-        QOverload<int>::of(&QComboBox::currentIndexChanged),
-        this, openSelectedSubdirectory);
+        QOverload<int>::of(&QComboBox::activated),
+        this, &MainWindow::openSelectedSubdirectory);
 
 	connect(ui.analyzeButton, &QPushButton::clicked,            // Кнопка запуска анализа текущего каталога.
         this, &MainWindow::analyzeCurrentDirectory);
 
 	connect(ui.statsModeComboBox,                               // Комбобокс выбора режима отображения статистики.
-        QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, [this](int)                                       // Лямбда-функция для обновления таблицы статистики при смене режима.
-        {
-            updateStatisticsTable();
-            updateChart();
-        });
+        QOverload<int>::of(&QComboBox::activated),
+		this, &MainWindow::updateChartAndTable);
 
     // При запуске показываем домашний каталог пользователя.
     updateDirectory(QDir::homePath());
@@ -113,8 +120,7 @@ void MainWindow::updateDirectory(const QString& path)                   // пу�
 
 
     // Обновление списка подкаталогов в комбобоксе.
-    const QSignalBlocker blocker(ui.subdirectoryComboBox);              // Блокируем сигналы для комбобокса подкаталогов, чтобы избежать вызова слота при обновлении списка.
-
+    
     ui.subdirectoryComboBox->clear();                                   // Очищаем список подкаталогов в чекербоксе перед его обновлением.
 
     const QFileInfoList subdirectories = directory.entryInfoList(       // Формируем список подкаталогов текущего каталога.
@@ -184,8 +190,7 @@ void MainWindow::analyzeCurrentDirectory()
 
     scanDirectory(currentPath, QString(), true);                    // Собираем размеры файлов и обе статистики.
 
-    updateStatisticsTable();                                        // Выводим собранную статистику
-    updateChart();                                                  // Обновляем диаграмму на основе той же статистики.
+    updateChartAndTable();                                          // Выводим собранную статистику
 
 	ui.statusLineEdit->setText(                                     // Сообщаем пользователю о завершении анализа и общем размере файлов.
         QStringLiteral("Анализ завершён. Общий размер: %1")
@@ -204,8 +209,7 @@ void MainWindow::scanDirectory(
     
     const QFileInfoList entries = directory.entryInfoList(          // Получаем содержимое каталога одним списком.
         QDir::AllEntries | QDir::NoDotAndDotDot
-        | QDir::Readable | QDir::NoSymLinks,
-        QDir::NoSort
+        | QDir::Readable | QDir::NoSymLinks
     );
 
 	for (const QFileInfo& entry : entries)                          // Обрабатываем каждый элемент каталога. entry - подкаталоги
@@ -230,30 +234,25 @@ void MainWindow::scanDirectory(
 				bucket,                                                         // Имя подкаталога верхнего уровня, к которому относятся файлы.
 				false                                                           // Флаг, указывающий, что текущий каталог не является корневым для анализа.
             );
-
-            continue;
         }
+		else if (entry.isFile()) {                                      // Если элемент является файлом
 
-		// Отбраковка нефайловых элементов
-        if (!entry.isFile())
-            continue;
+            qint64 fileSize = entry.size();                                 // Получаем размер файла в байтах.
 
-        // Обработка файлов
-		const qint64 fileSize = entry.size();                           // Получаем размер файла в байтах.
+            totalSize += fileSize;                                          // Увеличиваем общий размер файлов в каталоге.
+			categorySizes[fileCategory(entry.suffix())] += fileSize;        // Увеличиваем суммарный размер файлов в соответствующей категории. Создается новый элемент в categorySizes, если категория ещё не встречалась.
 
-		totalSize += fileSize;                                          // Увеличиваем общий размер файлов в каталоге.
-		categorySizes[fileCategory(entry.suffix())] += fileSize;        // Увеличиваем суммарный размер файлов в соответствующей категории.
+            if (isRoot)                                                     // Если текущий каталог является корневым для анализа
+            {
+                bucket = QStringLiteral("Файлы в корне");                       // Имя подкаталога верхнего уровня для файлов в корне каталога.
+            }
+            else
+            {
+                bucket = topLevelBucket;                                        // Имя подкаталога верхнего уровня передаётся рекурсивно.
+            }
 
-		if (isRoot)                                                     // Если текущий каталог является корневым для анализа
-        {
-			bucket = QStringLiteral("Файлы в корне");                       // Имя подкаталога верхнего уровня для файлов в корне каталога.
+			directorySizes[bucket] += fileSize;                             // Увеличиваем суммарный размер файлов в соответствующем подкаталоге верхнего уровня. Создается новый элемент в directorySizes, если подкаталог ещё не встречался.
         }
-        else
-        {
-			bucket = topLevelBucket;                                        // Имя подкаталога верхнего уровня передаётся рекурсивно.
-        }
-
-		directorySizes[bucket] += fileSize;                             // Увеличиваем суммарный размер файлов в соответствующем подкаталоге верхнего уровня.
     }
 }
 
@@ -265,8 +264,8 @@ QString MainWindow::fileCategory(const QString& extension)          // Прин�
     if (   suffix == QStringLiteral("jpg")                              // Категория "Изображения"
         || suffix == QStringLiteral("jpeg")
         || suffix == QStringLiteral("png")
-        || suffix == QStringLiteral("gif")
-        || suffix == QStringLiteral("bmp")
+		|| suffix == QStringLiteral("gif")                                  // QStringLiteral - макрос из библиотеки Qt, создающий
+        || suffix == QStringLiteral("bmp")                                  // объекты QString из строковых литералов на этапе компиляции
         || suffix == QStringLiteral("webp")
         || suffix == QStringLiteral("svg")
         || suffix == QStringLiteral("tif")
@@ -337,6 +336,24 @@ QString MainWindow::formatSize(qint64 bytes)                        // Прин�
         .arg(size / (1024.0 * 1024.0 * 1024.0), 0, 'f', 1);
 }
 
+// Вызывает updateStatisticsTable() и updateChart().
+void MainWindow::updateChartAndTable() {
+    updateStatisticsTable();                                                // Выводим собранную статистику
+    updateChart();                                                          // Обновляем диаграмму на основе той же статистики.
+}
+
+// возвращает словарь значений под выбранный режим отображения
+QMap<QString, qint64>* MainWindow::selectedView() {
+	if (ui.statsModeComboBox->currentIndex() == 0)                          // Если выбран режим отображения по категориям
+    {
+        return &directorySizes;                                                 // Указываем на статистику по подкаталогам.
+    }
+    else                                                                    // Если выбран режим "По категориям"
+    {
+        return &categorySizes;                                                  // Указываем на статистику по категориям.
+    }
+}
+
 // Выводит в таблицу статистику выбранного режима.
 void MainWindow::updateStatisticsTable()
 {
@@ -344,34 +361,23 @@ void MainWindow::updateStatisticsTable()
 
 	const QMap<QString, qint64>* statistics;                                // Указатель на выбранную статистику (по подкаталогам или по категориям).
 
-	if (ui.statsModeComboBox->currentIndex() == 0)                          // Если выбран режим "По подкаталогам"
-    {
-        statistics = &directorySizes;                                           // Указываем на статистику по подкаталогам.
-    }
-	else                                                                    // Если выбран режим "По категориям"
-    {
-		statistics = &categorySizes;                                            // Указываем на статистику по категориям.
-    }
+	statistics = selectedView();                                            // Получаем указатель на выбранную статистику.
 
 	for (auto it = statistics->cbegin(); it != statistics->cend(); ++it)    // Проходим по всем элементам выбранной статистики.
     {
-		const QString name = it.key();                                          // Получаем имя подкаталога или категории.
-		const qint64 size = it.value();                                         // Получаем суммарный размер файлов в подкаталоге или категории.
+		QString name = it.key();                                                // Получаем имя подкаталога или категории.
+		qint64 size = it.value();                                               // Получаем суммарный размер файлов в подкаталоге или категории.
 
-		double share;                                                           // Переменная для хранения доли размера в процентах.
+		double share = 0.0;                                                     // Переменная для хранения доли размера в процентах.
 
 		if (totalSize > 0)                                                      // Если общий размер файлов больше нуля
         {
 			share = static_cast<double>(size) * 100.0                               // Вычисляем долю размера в процентах.
                 / static_cast<double>(totalSize);
         }
-		else                                                                    // Если общий размер файлов равен нулю
-        {
-			share = 0.0;                                                            // Устанавливаем долю размера в процентах равной нулю. Защита от деления на ноль.
-        }
 
 		// Добавляем новую строку в таблицу статистики.
-		const int row = ui.statsTableWidget->rowCount();                        // Получаем текущее количество строк в таблице.
+		int row = ui.statsTableWidget->rowCount();                              // Получаем текущее количество строк в таблице.
 		ui.statsTableWidget->insertRow(row);                                    // Вставляем новую строку в конец таблицы.
         
         // Заполняем ячейки новой строки данными.
@@ -396,27 +402,18 @@ void MainWindow::updateChart()
     // Выбираем статистику, соответствующую текущему режиму.
 	const QMap<QString, qint64>* statistics;                                // Указатель на выбранную статистику.
 
-	if (ui.statsModeComboBox->currentIndex() == 0)                          // Если выбран режим "По подкаталогам"
-    {
-		statistics = &directorySizes;                                           // Указываем на статистику по подкаталогам.
-    }
-	else                                                                    // Если выбран режим "По категориям"
-    {
-		statistics = &categorySizes;                                            // Указываем на статистику по категориям.
-    }
+    statistics = selectedView();                                            // Получаем указатель на выбранную статистику.
 
-    // Создаём набор секторов круговой диаграммы.
-    QtCharts::QPieSeries* series = new QtCharts::QPieSeries();
+	// Очищаем старые сектора диаграммы.
+    series->clear();
 
     // Добавляем в диаграмму элементы статистики с ненулевым размером.
     qint64 otherSize = 0;                                                   // Храним общий размер файлов, попавших в категорию «Другое».
 
-    for (auto it = statistics->cbegin();                                    // Проходим по всем элементам выбранной статистики.
-        it != statistics->cend();
-        ++it)
+    for (auto it = statistics->cbegin(); it != statistics->cend(); ++it)    // Проходим по всем элементам выбранной статистики.
     {
-        const QString name = it.key();                                          // Получаем имя подкаталога или категории.
-        const qint64 size = it.value();                                         // Получаем суммарный размер файлов в подкаталоге или категории.
+        QString name = it.key();                                                // Получаем имя подкаталога или категории.
+        qint64 size = it.value();                                               // Получаем суммарный размер файлов в подкаталоге или категории.
 
         if (size <= 0)                                                          // Пропускаем элементы с нулевым размером, чтобы не отображать их на диаграмме.
         {
@@ -430,52 +427,30 @@ void MainWindow::updateChart()
 
             if (totalSize > 0)                                                      // Если общий размер файлов больше нуля
             {
-                share = static_cast<double>(it.value()) * 100.0                         // Вычисляем долю размера в процентах.
+                share = static_cast<double>(size) * 100.0                         // Вычисляем долю размера в процентах.
                     / static_cast<double>(totalSize);
             }
 
             // Объединяем элементы с долей меньше 2% в категорию «Другое».
             if (share < 2.0)                                                        // Если доля элемента меньше 2%
             {
-                otherSize += it.value();                                                // Увеличиваем суммарный размер файлов, попавших в категорию «Другое».
+                otherSize += size;                                                      // Увеличиваем суммарный размер файлов, попавших в категорию «Другое».
                 continue;                                                               // Пропускаем добавление этого элемента в диаграмму.
             }
         }
 
-		series->append(name, size);                // Добавляем сектор диаграммы с именем и размером.
+		series->append(name, size);                                             // Добавляем сектор диаграммы с именем и размером.
     }
 
     // Добавляем сектор «Другое», если в него попали файлы.
 	if (otherSize > 0)                                                      // Если суммарный размер файлов в категории «Другое» больше нуля
     {
-		series->append(                            // Добавляем сектор диаграммы с именем «Другое» и суммарным размером.
-            QStringLiteral("Другое"),
-            otherSize
-        );
+        series->append(QStringLiteral("Другое"), otherSize);                    // Добавляем сектор диаграммы с именем «Другое» и суммарным размером.
     }
 
-    // Создаём диаграмму и передаём ей подготовленную серию.
-	QtCharts::QChart* chart = new QtCharts::QChart();                       // Создаём объект диаграммы.
-	chart->addSeries(series);                                               // Добавляем серию секторов в диаграмму.
-
-    // Настраиваем заголовок и отображение диаграммы.
-	chart->setTitle(QStringLiteral("Распределение размера файлов"));        // Устанавливаем заголовок диаграммы.
-	chart->legend()->show();                                                // Показываем легенду диаграммы.
-
-	if (series->count() == 0)                                               // Если в диаграмме нет секторов (нет данных для отображения)
-    {
-		chart->setTitle(                                                        // Устанавливаем заголовок диаграммы, информирующий о том, что нет данных для отображения.
-            QStringLiteral("Нет данных для отображения")
-        );
-    }
-
-    QtCharts::QChart* oldChart = chartView->chart();                        // Получаем адрес старой диаграммы
-    if (oldChart)
-    {
-        oldChart->deleteLater();                                                // Удаляем старую диаграмму
-    }
-
-    // Передаём диаграмму виджету отображения.
-	chartView->setChart(chart);                                             // Устанавливаем новую диаграмму в виджет отображения диаграммы.
-	chartView->setRenderHint(QPainter::Antialiasing);                       // Включаем сглаживание для улучшения качества отображения диаграммы.
+    // Обновляем заголовок
+	if (series->count() == 0)                                               // Если в диаграмме нет секторов
+		chart->setTitle(QStringLiteral("Нет данных для отображения"));          // Устанавливаем заголовок диаграммы как "Нет данных для отображения".
+	else                                                                    // Если в диаграмме есть хотя бы один сектор
+		chart->setTitle(QStringLiteral("Распределение размера файлов"));        // Устанавливаем заголовок диаграммы как "Распределение размера файлов".
 }
