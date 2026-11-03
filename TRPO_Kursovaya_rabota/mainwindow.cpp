@@ -59,7 +59,7 @@ MainWindow::MainWindow(QWidget* parent)
         this, &MainWindow::navigateToParentDirectory);
 
     connect(ui.subdirectoryComboBox,                            // Комбобокс перехода в выбранный подкаталог.
-        QOverload<int>::of(&QComboBox::activated),
+        QOverload<int>::of(&QComboBox::activated),                  //QOverload нужен для выбора нужной версии сигнала activated
         this, &MainWindow::openSelectedSubdirectory);
 
 	connect(ui.analyzeButton, &QPushButton::clicked,            // Кнопка запуска анализа текущего каталога.
@@ -137,8 +137,8 @@ void MainWindow::updateDirectory(const QString& path)                   // пу�
         );
     }
 
-
-    ui.upButton->setEnabled(directory.cdUp());                          // Переключаем кнопку перехода в родительский каталог, в соответствии с его доступностью.
+	QDir parent = directory;                                            // Создаем промежуточный объект QDir для проверки доступности родительского каталога.
+    ui.upButton->setEnabled(parent.cdUp());                             // Переключаем кнопку перехода в родительский каталог, в соответствии с его доступностью.
 
     if (subdirectories.isEmpty())                                       //Соообщаем пользователю об отсутствии доступных подкаталогов.
     {
@@ -344,7 +344,7 @@ void MainWindow::updateChartAndTable() {
 
 // возвращает словарь значений под выбранный режим отображения
 QMap<QString, qint64>* MainWindow::selectedView() {
-	if (ui.statsModeComboBox->currentIndex() == 0)                          // Если выбран режим отображения по категориям
+	if (ui.statsModeComboBox->currentIndex() == 0)                          // Если выбран режим отображения по подкаталогам
     {
         return &directorySizes;                                                 // Указываем на статистику по подкаталогам.
     }
