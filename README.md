@@ -92,6 +92,90 @@
 | `mainwindow.ui` | Описание графического интерфейса, созданного в Qt Designer |
 | `main.cpp` | Точка входа в приложение |
 
+Вот готовый текст раздела, который можно вставить вместо отсутствующего **«Сборка и запуск»**.
+
+## Сборка и запуск
+
+### Требования
+
+- ОС Windows 10/11 (x64)
+- Visual Studio 2022 (рабочая нагрузка «Разработка классических приложений на C++»)
+- Qt 5.15.x (x64) с модулями: `Core`, `Gui`, `Widgets`, `Charts`
+- Расширение **Qt Visual Studio Tools** для Visual Studio
+
+Проект собирался с Qt 5.15.14 и toolset v143.
+
+### Установка Qt
+
+1. Скачайте онлайн-установщик Qt: https://www.qt.io/download-qt-installer  
+2. Установите Qt 5.15.x для MSVC 2019/2022 64-bit.  
+3. В списке компонентов отметьте:
+   - Qt 5.15.x → MSVC 2019 64-bit (или MSVC 2022 64-bit)
+   - Qt Charts
+4. Установите расширение **Qt Visual Studio Tools**:
+   - в Visual Studio: *Extensions → Manage Extensions → Online*
+   - найдите «Qt Visual Studio Tools» и установите
+
+### Настройка Qt в Visual Studio
+
+1. Откройте Visual Studio.
+2. Перейдите в *Extensions → Qt VS Tools → Qt Versions*.
+3. Добавьте путь к установленному Qt, например:  
+   `C:\Qt\5.15.14\msvc2019_64`
+4. Сделайте эту версию версией по умолчанию.
+
+> Если в файле проекта указано другое имя версии Qt, в свойствах проекта  
+> (*Configuration Properties → Qt Project Settings → Qt Installation*)  
+> выберите вашу установленную версию.
+
+### Получение исходного кода
+
+```
+bash
+git clone https://github.com/alaramia122/TRPO_Kursovaya_rabota.git
+cd TRPO_Kursovaya_rabota
+```
+
+Либо скачайте ZIP-архив репозитория и распакуйте его.
+
+### Сборка
+
+1. Откройте файл решения `TRPO_Kursovaya_rabota.slnx` (или `.sln`, если есть) в Visual Studio.
+2. В панели конфигурации выберите:
+   - **Release | x64** — для обычного запуска
+   - **Debug | x64** — для отладки
+3. Соберите проект: *Build → Build Solution* (или `Ctrl+Shift+B`).
+
+После успешной сборки исполняемый файл будет в каталоге вида:
+
+```
+TRPO_Kursovaya_rabota\x64\Release\TRPO_Kursovaya_rabota.exe
+```
+
+(точный путь зависит от настроек выходного каталога в проекте).
+
+### Запуск
+
+**Из Visual Studio:**  
+нажмите *Local Windows Debugger* / *Start Without Debugging* (`Ctrl+F5`).
+
+**Напрямую:**  
+запустите `TRPO_Kursovaya_rabota.exe` из папки сборки.
+
+> Если при запуске вне Visual Studio появляется ошибка о недостающих DLL Qt  
+> (`Qt5Core.dll`, `Qt5Charts.dll` и т.п.), добавьте в `PATH` каталог `bin` вашей установки Qt  
+> (например, `C:\Qt\5.15.14\msvc2019_64\bin`)  
+> или скопируйте нужные DLL рядом с `.exe`.
+
+### Возможные проблемы
+
+| Проблема | Что сделать |
+|----------|-------------|
+| Не находится Qt / QtMsBuild | Установите Qt VS Tools и укажите версию Qt в *Qt Versions* |
+| Ошибки линковки Charts | Убедитесь, что модуль Qt Charts установлен и подключён в проекте |
+| Не хватает DLL при запуске | Добавьте `...\Qt\5.15.x\msvcXXXX_64\bin` в PATH |
+| Ошибки кодировки / кириллицы | В проекте для Release уже указан `/utf-8`; для Debug при необходимости добавьте его вручную |
+
 
 ## Работа с приложением
 
