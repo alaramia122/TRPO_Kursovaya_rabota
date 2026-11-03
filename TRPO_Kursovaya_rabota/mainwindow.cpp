@@ -49,11 +49,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(ui.subdirectoryComboBox,                            // Комбобокс перехода в выбранный подкаталог.
         QOverload<int>::of(&QComboBox::currentIndexChanged),
-        this, [this](int index)                                     // Лямбда-функция для перехода в выбранный подкаталог. 
-        {
-			if (index >= 0)                                             // Проверяем, что выбран подкаталог (индекс не отрицательный).
-                openSelectedSubdirectory();
-        });
+        this, openSelectedSubdirectory);
 
 	connect(ui.analyzeButton, &QPushButton::clicked,            // Кнопка запуска анализа текущего каталога.
         this, &MainWindow::analyzeCurrentDirectory);
@@ -446,13 +442,13 @@ void MainWindow::updateChart()
             }
         }
 
-		QtCharts::QPieSlice* slice = series->append(name, size);                // Добавляем сектор диаграммы с именем и размером.
+		series->append(name, size);                // Добавляем сектор диаграммы с именем и размером.
     }
 
     // Добавляем сектор «Другое», если в него попали файлы.
 	if (otherSize > 0)                                                      // Если суммарный размер файлов в категории «Другое» больше нуля
     {
-		QtCharts::QPieSlice* slice = series->append(                            // Добавляем сектор диаграммы с именем «Другое» и суммарным размером.
+		series->append(                            // Добавляем сектор диаграммы с именем «Другое» и суммарным размером.
             QStringLiteral("Другое"),
             otherSize
         );
@@ -473,7 +469,13 @@ void MainWindow::updateChart()
         );
     }
 
+    QtCharts::QChart* oldChart = chartView->chart();                        // Получаем адрес старой диаграммы
+    if (oldChart)
+    {
+        oldChart->deleteLater();                                                // Удаляем старую диаграмму
+    }
+
     // Передаём диаграмму виджету отображения.
-	chartView->setChart(chart);                                             // Устанавливаем диаграмму в виджет отображения диаграммы.
+	chartView->setChart(chart);                                             // Устанавливаем новую диаграмму в виджет отображения диаграммы.
 	chartView->setRenderHint(QPainter::Antialiasing);                       // Включаем сглаживание для улучшения качества отображения диаграммы.
 }
